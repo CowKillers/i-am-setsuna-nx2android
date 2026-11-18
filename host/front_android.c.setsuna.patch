@@ -1,0 +1,35 @@
+# I am Setsuna — patch para nxnative/dm/android/front_android.c: só o hunk
+# do hold_sync (g_held_kind + notas dm_audio_note_event MENU/TEXT/BG/FG).
+# Os outros 9 hunks do diff do fork pertencem a outro projeto e foram
+# EXCLUÍDOS de propósito (ver host/README.md): o overlay do repo já tem
+# fallbacks fracos para as funções de mira por toque, então o host
+# compila sem eles e o touch-aim fica desligado por padrão.
+# Aplicar a partir da raiz do checkout do nx2android:
+#   git apply <este-repo>/host/front_android.c.setsuna.patch
+
+diff --git a/nxnative/dm/android/front_android.c b/nxnative/dm/android/front_android.c
+--- a/nxnative/dm/android/front_android.c
++++ b/nxnative/dm/android/front_android.c
+@@ -96,10 +96,21 @@ __attribute__((weak)) void dm_overlay_redraw(void) {}   // the backend presents
+ static _Atomic int g_running, g_bg, g_menu;
+ static pthread_mutex_t g_hold_mu = PTHREAD_MUTEX_INITIALIZER; static int g_held;
+ static _Atomic int g_tx_on;   // text entry open (front_text_input): the game is held as by the menu
++static int g_held_kind;   // what holds the game: 1 pause menu, 2 text entry, 3 background (for the watchdog's stall line)
+ static void hold_sync(void) {
+     pthread_mutex_lock(&g_hold_mu);
+     int want = atomic_load(&g_bg) || atomic_load(&g_menu) || atomic_load(&g_tx_on);
+-    if (want != g_held) { g_held = want; if (want) { dm_movie_hold(1); dm_audio_suspend(1); guest_clock_freeze_for(1, 1); } else { guest_clock_freeze_for(1, 0); dm_audio_suspend(0); dm_movie_hold(0); } }
++    if (want != g_held) {
++        g_held = want;
++        if (want) {
++            g_held_kind = atomic_load(&g_menu) ? 1 : atomic_load(&g_tx_on) ? 2 : 3;
++            dm_movie_hold(1); dm_audio_suspend(1); guest_clock_freeze_for(1, 1);
++            dm_audio_note_event(g_held_kind == 1 ? DM_AU_EV_MENU_OPEN : g_held_kind == 2 ? DM_AU_EV_TEXT_OPEN : DM_AU_EV_BG);   // after the suspend, so the reason (not the suspend) is the last event
++        } else {
++            guest_clock_freeze_for(1, 0); dm_audio_suspend(0); dm_movie_hold(0);
++            dm_audio_note_event(g_held_kind == 1 ? DM_AU_EV_MENU_CLOSE : g_held_kind == 2 ? DM_AU_EV_TEXT_CLOSE : DM_AU_EV_FG);
++        }
++    }
+     pthread_mutex_unlock(&g_hold_mu);
+ }
+ static void shake_sensor(int on);   // the accelerometer, off in the background (input, below)

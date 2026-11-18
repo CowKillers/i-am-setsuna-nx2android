@@ -9,8 +9,8 @@
   a seção Assinatura).
 - Python 3 (com Pillow, para `gen_assets_v13.py`).
 - Um checkout do [nx2android](https://github.com/shirai91/nx2android)
-  (o código do host em si **não** está neste repositório, só os 5 arquivos
-  alterados para este jogo em `host/`).
+  (o código do host em si **não** está neste repositório, só as
+  alterações deste jogo em `host/`: 6 arquivos completos + 6 patches).
 - Bibliotecas adrenotools (veja abaixo).
 - O seu próprio dump do jogo (NSP 1.1.0) e as suas `prod.keys` — fora
   do repositório, sempre.
@@ -47,11 +47,24 @@ gera o data pack na pasta do jogo. Nada disso volta para este repositório.
 
 ## 2. Host
 
-Os 5 arquivos em `host/` são as alterações deste jogo sobre o
-nx2android (3 em `nxnative/dm/android/`, 2 de áudio em
-`nxnative/dm/host/` — veja `host/README.md` para o que cada um faz).
-Copie-os por cima dos originais no seu checkout do nx2android (faça
-backup dos originais antes), e compile:
+Os arquivos em `host/` são as alterações deste jogo sobre o
+nx2android (3 em `nxnative/dm/android/`, 3 de áudio em
+`nxnative/dm/host/`, mais 6 patches — veja `host/README.md` para o
+que cada um faz). Copie os arquivos por cima dos originais no seu
+checkout do nx2android (faça backup dos originais antes) e aplique
+os patches a partir da raiz do checkout:
+
+```sh
+cp <este-repo>/host/gfx_vk_present.c <este-repo>/host/font_aa.h \
+  <este-repo>/host/overlay_layout.h nxnative/dm/android/
+cp <este-repo>/host/hle_audren.c <este-repo>/host/hle_audio.c \
+  <este-repo>/host/hle_audren_sf.c nxnative/dm/host/
+for p in dm.h hle_sf.c hle_oe.c hle_thread.c hle_svc.c front_android.c; do
+  git apply <este-repo>/host/$p.setsuna.patch
+done
+```
+
+E compile:
 
 ```sh
 DM_GAMES_DIR=<este-repo>/profile \
@@ -67,12 +80,15 @@ Isso gera `host/out/libdmhost.so`. O `DM_GAMES_DIR` aponta para a pasta
 > de um fork-local do nx2android que carrega outras alterações não
 > commitadas de outros projetos. As correções de áudio do Setsuna
 > (`hle_audren.c`, catch-up da v5; `hle_audio.c`, diagnóstico de stall)
-> **estão** neste repositório desde o segundo commit — mas a cola que
+> **estão** neste repositório desde o segundo commit — e a cola que
 > as liga ao resto do host (as declarações em `dm.h`, o despachante
-> `hle_audren_sf.c` e o gancho `audren:u` em `hle_sf.c`) ainda não
-> está, e o `dm.h` do fork está misturado com outros projetos. O build
-> acima é o caminho documentado, não um build provado: o host
-> resultante pode diferir do hash da v21. Veja `host/README.md`.
+> `hle_audren_sf.c` e o gancho `audren:u` em `hle_sf.c`, mais os
+> patches de `hle_thread.c`, `hle_svc.c`, `hle_oe.c` e
+> `front_android.c`) **está** desde o terceiro commit. O build acima
+> é o caminho documentado, não um build provado: o host resultante
+> pode diferir do hash da v21, porque o fork também carrega
+> alterações de outros projetos que ficam fora daqui de propósito.
+> Veja `host/README.md`.
 
 ## 3. Adrenotools
 

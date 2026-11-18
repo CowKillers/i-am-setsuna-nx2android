@@ -1,0 +1,73 @@
+# I am Setsuna — patch para nxnative/dm/host/hle_thread.c: as implementações
+# que o serviço audren:u chama — hle_create_event, hle_create_transfer_memory
+# (SVC 0x15, tipo O_TMEM no CloseHandle), hle_signal_event e hle_clear_event.
+# Sem este patch o host não linka (hle_audren.c chama as quatro funções).
+# Todos os hunks do diff do fork; nada de outro projeto.
+# Aplicar a partir da raiz do checkout do nx2android:
+#   git apply <este-repo>/host/hle_thread.c.setsuna.patch
+
+diff --git a/nxnative/dm/host/hle_thread.c b/nxnative/dm/host/hle_thread.c
+--- a/nxnative/dm/host/hle_thread.c
++++ b/nxnative/dm/host/hle_thread.c
+@@ -29,7 +29,7 @@
+ #define WAITERS_BIT   0x40000000u
+ #define H_CUR_THREAD  0xFFFF8000u
+ 
+-enum { O_FREE, O_THREAD, O_EVENT_R, O_EVENT_W };
++enum { O_FREE, O_THREAD, O_EVENT_R, O_EVENT_W, O_TMEM };   // O_TMEM: a transfer memory (SVC 0x15 CreateTransferMemory)
+ // Service-layer SystemEvent bindings (see hle_bind_system_event): guest SystemEventType address → the write-end handle of its kernel event.
+ // An entry lives as long as that handle: CloseHandle on it removes the entry (se_unbind), so a SystemEvent destroyed and created again at the same address gets a new kernel event.
+ // Entries used to stay forever: the second bind returned early, the new event was never created and signals went to the closed handle (or to whatever event reused its number).
+@@ -932,6 +932,8 @@ static int svc_thread_impl(int num, uint64_t *regs) {
+             if (g_h[i].type == O_EVENT_W) se_unbind((uint32_t)regs[0]);
+             event_t *e = g_h[i].obj; if (--e->refs == 0) free(e);
+             g_h[i].type = O_FREE; g_h[i].obj = NULL;
++        } else if (i > 0 && i < MAX_H && g_h[i].type == O_TMEM) {   // a transfer memory: just free the record
++            free(g_h[i].obj); g_h[i].type = O_FREE; g_h[i].obj = NULL;
+         } else if (i > 0 && i < MAX_H && g_h[i].type == O_THREAD) {
+             thr_t *t = g_h[i].obj;
+             g_h[i].type = O_FREE; g_h[i].obj = NULL;
+@@ -1001,3 +1003,43 @@ void hle_clear_system_event(void *ev) {   // Clear a bound service-layer SystemE
+     }
+     pthread_mutex_unlock(&G);
+ }
++
++// ---------- Kernel events for IPC services (audren:u QuerySystemEvent) ----------
++// A service that hands a readable event to the client (copy handle in the reply)
++// creates the kernel event itself, as SVC 0x45 does: the write end stays with the
++// service (it signals after each RequestUpdate), the read end goes to the client.
++uint32_t hle_create_event(uint32_t *read_end) {   // returns the write-end handle; the read end in *read_end (both 0 on failure, which cannot happen: the table holds 4096)
++    event_t *e = calloc(1, sizeof *e); e->refs = 2;
++    pthread_mutex_lock(&G); uint32_t hw = h_new(O_EVENT_W, e), hr = h_new(O_EVENT_R, e); pthread_mutex_unlock(&G);
++    if (read_end) *read_end = hr;
++    return hw;
++}
++// ---------- Transfer memory (SVC 0x15 CreateTransferMemory) ----------
++// A game that hands a buffer to a service (audren's work buffer) creates a
++// transfer memory over it and passes the handle in the IPC request. The host
++// reads guest memory directly, so the record is only the range — but the
++// handle must still be real: the client closes it when the renderer closes,
++// and a placeholder that left the out slot uninitialized made the client
++// close whatever stale value the stack held, which could have been a live
++// event or thread handle (I am Setsuna, v3 log).
++typedef struct { uint64_t addr, size; uint32_t perm; } tmem_t;
++uint32_t hle_create_transfer_memory(uint64_t addr, uint64_t size, uint32_t perm) {
++    tmem_t *t = malloc(sizeof *t); if (!t) die("transfer memory alloc failed");
++    t->addr = addr; t->size = size; t->perm = perm;
++    pthread_mutex_lock(&G); uint32_t h = h_new(O_TMEM, t); pthread_mutex_unlock(&G);
++    return h;
++}
++void hle_signal_event(uint32_t wh) {   // Signal a kernel event by its write-end handle (any thread); a stale handle is a real error, like SignalEvent on it
++    pthread_mutex_lock(&G);
++    event_t *e = h_get(wh, O_EVENT_W);
++    if (!e) die("hle_signal_event invalid write-end handle %#x", wh);
++    e->signaled = 1; wake_sync_waiters(e);
++    pthread_mutex_unlock(&G);
++}
++void hle_clear_event(uint32_t wh) {   // Clear a kernel event by its write-end handle (any thread)
++    pthread_mutex_lock(&G);
++    event_t *e = h_get(wh, O_EVENT_W);
++    if (!e) die("hle_clear_event invalid write-end handle %#x", wh);
++    e->signaled = 0;
++    pthread_mutex_unlock(&G);
++}

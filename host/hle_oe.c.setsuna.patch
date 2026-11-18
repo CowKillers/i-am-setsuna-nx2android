@@ -1,0 +1,17 @@
+# I am Setsuna — patch para nxnative/dm/host/hle_oe.c: a nota de evento
+# de foco (dm_audio_note_event(DM_AU_EV_FOCUS)) no dm_focus_set, para a
+# linha de stall do watchdog dizer o que o foco fazia antes do stall.
+# Aplicar a partir da raiz do checkout do nx2android:
+#   git apply <este-repo>/host/hle_oe.c.setsuna.patch
+
+diff --git a/nxnative/dm/host/hle_oe.c b/nxnative/dm/host/hle_oe.c
+--- a/nxnative/dm/host/hle_oe.c
++++ b/nxnative/dm/host/hle_oe.c
+@@ -72,6 +72,7 @@ void dm_focus_set(int st) {
+     if (st == 3 && atomic_load(&g_focus_mode) == 1) st = 2;
+     if (st == 1) atomic_store(&g_focus_in_ns, now_ns());
+     if (atomic_exchange(&g_focus, st) == st) return;
++    dm_audio_note_event(DM_AU_EV_FOCUS);   // the watchdog's stall line says what the focus was doing just before a device stall
+     LOG("oe focus state → %d", st);
+     if (focus_notifies()) mq_push(MSG_FOCUS);
+ }

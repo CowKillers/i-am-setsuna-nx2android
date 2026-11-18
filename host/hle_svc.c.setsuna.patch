@@ -1,0 +1,21 @@
+# I am Setsuna — patch para nxnative/dm/host/hle_svc.c: o caso SVC 0x15
+# CreateTransferMemory — um handle real para o work buffer do audren.
+# Sem ele o placeholder deixava o slot de saída sem inicializar e o jogo
+# fechava um handle qualquer da pilha (log da v3).
+# Aplicar a partir da raiz do checkout do nx2android:
+#   git apply <este-repo>/host/hle_svc.c.setsuna.patch
+
+diff --git a/nxnative/dm/host/hle_svc.c b/nxnative/dm/host/hle_svc.c
+--- a/nxnative/dm/host/hle_svc.c
++++ b/nxnative/dm/host/hle_svc.c
+@@ -332,6 +332,10 @@ uint64_t svc_dispatch(int num, uint64_t *regs, uint64_t orig_addr) {
+         }
+         regs[0] = 0; regs[1] = v; return 0;
+     }
++    case 0x15: {  // CreateTransferMemory(out*, addr, size, perm): a real handle for the range. A game hands the buffer to a service in the IPC request and closes the handle later (audren's work buffer); the old placeholder left the out slot uninitialized, so the client closed whatever stale value the stack held — which could have been a live event or thread handle.
++        uint32_t h = hle_create_transfer_memory(regs[1], regs[2], (uint32_t)regs[3]);
++        *(uint32_t *)regs[0] = h; regs[0] = 0; return 0;
++    }
+     default:
+         if (!g_seen[num & 0xff]) { g_seen[num & 0xff] = 1; LOG("SVC %#x x0=%#llx x1=%#llx x2=%#llx (placeholder returns success)", num, regs[0], regs[1], regs[2]); }
+         regs[0] = 0; return 0;

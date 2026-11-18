@@ -1,0 +1,58 @@
+# I am Setsuna — patch para nxnative/dm/host/dm.h: só os hunks do Setsuna.
+# Declarações do serviço audren:u (hle_create_event, hle_create_transfer_memory,
+# hle_signal_event, hle_clear_event, audren_svc_*, audren_sf_handle,
+# sf_new_session_obj) e do estado de suspensão de áudio (dm_audio_is_suspended,
+# DM_AU_EV_*, dm_audio_note_event). Os hunks de outros projetos foram
+# EXCLUÍDOS de propósito (ver host/README.md).
+# Aplicar a partir da raiz do checkout do nx2android:
+#   git apply <este-repo>/host/dm.h.setsuna.patch
+
+diff --git a/nxnative/dm/host/dm.h b/nxnative/dm/host/dm.h
+--- a/nxnative/dm/host/dm.h
++++ b/nxnative/dm/host/dm.h
+@@ -126,6 +126,32 @@ void hle_signal_system_event(void *g);   // hle_thread.c: signal a service-layer
+ void hle_bind_system_event(void *g, int autoclear);   // On a guest thread, bind a guest SystemEvent to a kernel event
+ void hle_clear_system_event(void *g);    // hle_thread.c: clear a bound service-layer SystemEvent (any thread)
+ int hle_signal_bound_system_event(void *g);   // hle_thread.c: signal a service-layer SystemEvent only if it is bound (any thread); 0 when it is not
++uint32_t hle_create_event(uint32_t *read_end);   // hle_thread.c: create a kernel event, return its write-end handle (read end in *read_end), for IPC services
++uint32_t hle_create_transfer_memory(uint64_t addr, uint64_t size, uint32_t perm);   // hle_thread.c: SVC 0x15 CreateTransferMemory — a real handle for the range (the client passes it to a service and closes it later)
++void hle_signal_event(uint32_t wh);      // hle_thread.c: signal a kernel event by its write-end handle (any thread)
++void hle_clear_event(uint32_t wh);       // hle_thread.c: clear a kernel event by its write-end handle (any thread)
++// audren:u service (hle_audren.c): the SDK 1 renderer's state, driven by IPC (hle_audren_sf.c)
++size_t audren_work_buffer_size(const uint32_t *param);   // service formula for GetAudioRendererWorkBufferSize (param: 13 u32s)
++void audren_svc_open(const uint32_t *param);   // record the opened renderer's parameter, create its system event
++void audren_svc_note_game_event(void *ev);     // the game's SystemEvent passed to OpenAudioRenderer (recorded for reference)
++uint32_t audren_svc_rate(void);                // GetSampleRate
++uint32_t audren_svc_count(void);               // GetSampleCount
++uint32_t audren_svc_mix(void);                 // GetMixBufferCount
++uint32_t audren_svc_state(void);               // GetState: 0 Started, 1 Stopped
++void audren_svc_start(void);                   // Start
++void audren_svc_stop(void);                    // Stop
++void audren_svc_close(void);                   // Close: stop the catch-up cadence and close the PCM output (idempotent)
++uint32_t audren_svc_event_read(void);          // QuerySystemEvent: the read-end handle of the renderer's event
++uint32_t audren_svc_update(const uint8_t *in, size_t in_len, uint8_t *out, size_t out_len, uint8_t *perf, size_t perf_len);   // RequestUpdate (Result)
++// The audren:u IPC service (hle_audren_sf.c): dispatches the manager and
++// IAudioRenderer commands for a host session. Called from h_sf_Send when the
++// session name is "audren:u". base is the message buffer, size its size, dom
++// whether the session is a domain, obj the domain object id, cmd the command,
++// ndw the data word count, ver the CMIF version, hin the CMIF offset, desc
++// the A descriptors (X descriptors come first on the wire; audren sends
++// none), na/nb their counts. Returns the Result to report in the response.
++uint32_t audren_sf_handle(uint8_t *base, uint64_t size, int dom, unsigned obj, unsigned cmd, unsigned ndw, uint32_t ver, size_t hin, const uint32_t *desc, unsigned na, unsigned nb);
++uint32_t sf_new_session_obj(const char *name, unsigned obj);   // hle_sf.c: a host session serving one service object (0 manager, 2 audren renderer) — for returning an object as a move handle on a plain session
+ // Page fault hook / hook before the host writes guest memory (crash.c; used for write-protect dirty page tracking)
+ void dm_fault_hook_register(int (*fn)(void *addr, int is_write, void *uc));
+ void dm_guest_write_prep_register(void (*fn)(void *addr, size_t len));
+@@ -135,6 +161,12 @@ void dm_guest_write_prepare(void *addr, size_t len);
+ // Graphics lifecycle (hle_nvn.c): on=1 suspends (afterwards submit / present block, and in-flight GPU work is drained before returning), on=0 resumes; called by the iOS front end when entering and leaving the background
+ void dm_gfx_suspend(int on);
+ void dm_movie_hold(int on);   // hle_movie.c: the game is held (background, pause menu); the time held is no movie decoder's idle time (md_tail)
++// Audio suspend state (hle_audio.c): the front end suspends real audio when the game is held (pause menu / background / text entry / oe suspend).
++// The audio catch-up thread reads it to freeze the voice while held; the front end notes the specific reason, so the watchdog's stall line can say
++// what happened just before a device stall.
++int dm_audio_is_suspended(void);
++enum { DM_AU_EV_NONE, DM_AU_EV_SUSPEND, DM_AU_EV_RESUME, DM_AU_EV_FOCUS, DM_AU_EV_MENU_OPEN, DM_AU_EV_MENU_CLOSE, DM_AU_EV_TEXT_OPEN, DM_AU_EV_TEXT_CLOSE, DM_AU_EV_BG, DM_AU_EV_FG };
++void dm_audio_note_event(int ev);
+ void dm_gfx_enter(void); void dm_gfx_leave(void);   // hle_nvn.c: the gate dm_gfx_suspend closes, for graphics layers other than NVN (dm/gfx/vk)
+ void dm_gfx_shot_at(long k, const char *path);
+ void dm_shot_written(const char *path, int ok);   // The graphics side finished writing a screenshot to disk (diag.c: DM_TICK_HOLD=E:SHOT unfreezes on this)
