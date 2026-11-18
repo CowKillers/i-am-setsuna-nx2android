@@ -1,0 +1,35 @@
+# Nada do jogo, das chaves, do APK, dos dados ou dos logs entra aqui.
+*.xci
+*.nsp
+*.nsz
+*.xcz
+*.apk
+*.aab
+prod.keys
+title.keys
+*.keys
+*.keystore
+*.jks
+signing-key.json
+shaders.dmsv
+shaders*.dmsv
+RomFS/
+mods/
+*-data/
+*-data.zip
+*.log
+log.txt
+log.prev.txt
+captured_shaders/
+env.txt
+settings.txt
+donate_pix_qr.png
+# Build outputs
+*/build/
+host/out/
+obj/
+__pycache__/
+.DS_Store
+local.properties
+vk_pipelines.bin
+vk_pipeline_cache
