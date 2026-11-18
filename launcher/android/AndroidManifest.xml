@@ -25,7 +25,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name="android.app.NativeActivity"
+            android:name="org.nx2a.launcher.GameActivity"
             android:label="@string/app_name"
             android:icon="@drawable/ic_launcher"
             android:screenOrientation="sensorLandscape"

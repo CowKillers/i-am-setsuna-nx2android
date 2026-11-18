@@ -51,8 +51,9 @@ import java.util.zip.ZipInputStream;
  * The app label comes from the APK manifest, so this dex needs no
  * per-game rebuild: the game is whatever data pack lives in this
  * app's external files folder (RomFS/, shaders.dmsv, env.txt).
- * - Play: android.app.NativeActivity in this same package, only when
- *   RomFS/ and shaders.dmsv are present; otherwise Play opens Import.
+ * - Play: org.nx2a.launcher.GameActivity (NativeActivity com modo
+ *   imersivo, v22) neste mesmo pacote, somente quando RomFS/ e
+ *   shaders.dmsv estao presentes; senao Play abre Import.
  * - Import game: a SAF folder or zip whose top level is RomFS,
  *   shaders.dmsv and env.txt (the porter data pack), copied with
  *   progress into getExternalFilesDir(). No game file, key or driver
@@ -630,7 +631,7 @@ public class LauncherActivity extends Activity {
             loadFpsTarget();
             saveFpsTarget();
             Intent i = new Intent();
-            i.setClassName(getPackageName(), "android.app.NativeActivity");
+            i.setClassName(getPackageName(), "org.nx2a.launcher.GameActivity");
             startActivity(i);
         } else {
             showImportDialog();

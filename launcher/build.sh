@@ -7,7 +7,9 @@
 # the local headers and breaks the dex alignment realign.py established.
 # Host: build it first from ../host (see host/README.md); this script
 # expects it at ../host/out/libdmhost.so (HOST_SO overrides).
-# versionCode only ever increases (last used: 1794915277, launcher v21).
+# versionCode only ever increases (last used: 1794971504, launcher v22).
+# v22: GameActivity com modo imersivo no gameplay — javac compila os
+# dois .java (LauncherActivity + GameActivity); fora isso, igual a v21.
 set -e
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 JDK="${JDK:-/usr/lib/jvm/java-17-openjdk-amd64}"
@@ -47,7 +49,8 @@ echo "[1/6] aapt2 compile res"
 
 echo "[2/6] javac + d8"
 "$JDK/bin/javac" -encoding UTF-8 --release 8 -cp "$ANDROID_JAR" -d "$BUILD/classes" \
-  "$ROOT/android/src/org/nx2a/launcher/LauncherActivity.java"
+  "$ROOT/android/src/org/nx2a/launcher/LauncherActivity.java" \
+  "$ROOT/android/src/org/nx2a/launcher/GameActivity.java"
 "$BT/d8" --min-api 29 --lib "$ANDROID_JAR" --output "$BUILD/dex" \
   "$BUILD"/classes/org/nx2a/launcher/*.class
 
