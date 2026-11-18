@@ -24,6 +24,19 @@ serviços do Switch e o NVN reproduzido em Vulkan, sem emulador.
   legível (sem a fonte pixelada original do host).
 - Driver de GPU: sistema ou Turnip 8g2 embutido (via adrenotools).
 
+## Capturas
+
+Capturas do jogo rodando no Galaxy S23 (launcher v21):
+
+![Diálogo em PT-BR a 60 FPS](docs/screenshots/gameplay-dialogo-hapsper.jpg)
+*Diálogo em PT-BR a 60 FPS, com o overlay do gamepad.*
+
+![Teclado do jogo](docs/screenshots/teclado-nome-cow.jpg)
+*O teclado do jogo no tema do launcher, com o nome "cow" digitado.*
+
+![Tela de título](docs/screenshots/tela-titulo.jpg)
+*A tela de título em PT-BR.*
+
 ## O que NÃO está aqui (e nunca vai estar)
 
 - Arquivos do jogo: dump (NSP), RomFS, `shaders.dmsv`, data pack, APKs.
