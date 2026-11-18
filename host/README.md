@@ -1,9 +1,10 @@
 # Host — arquivos alterados para I am Setsuna
 
-Estes 3 arquivos são as alterações deste jogo sobre o
-`nxnative/dm/android/` do nx2android. Copie-os por cima dos originais
-no seu checkout do nx2android (faça backup dos originais antes) e
-compile como descrito em `../BUILD.md`:
+Estes 5 arquivos são as alterações deste jogo sobre o nx2android.
+Os 3 primeiros vão em `nxnative/dm/android/`; os 2 de áudio vão em
+`nxnative/dm/host/`. Copie-os por cima dos originais no seu checkout
+do nx2android (faça backup dos originais antes) e compile como
+descrito em `../BUILD.md`:
 
 ```sh
 DM_GAMES_DIR=<este-repo>/profile \
@@ -27,16 +28,35 @@ DM_GAMES_DIR=<este-repo>/profile \
   itens, modos Handheld/Docked) e do teclado (44 teclas). Este arquivo
   está byte-idêntico ao do upstream — ele está aqui porque é o arquivo
   com que o host da v21 foi buildado, não porque foi alterado.
+- `hle_audren.c` — o serviço de áudio audren:u para SDK 1 (o jogo é
+  SDK 1_3_1 e não carrega código de renderer no lado do servidor):
+  o mixer do UpdateData (vozes PCM16 → estéreo), o estado do
+  renderer, e o catch-up da v5 — uma thread a cada 5 ms re-renderiza
+  240 amostras do último UpdateData e alimenta a saída PCM, porque o
+  relógio de áudio do jogo roda a ~0,37x do tempo real. Inclui também
+  a detecção de renderer server-side (`audren_server_side()`) e o
+  parâmetro de 0x34 bytes do SDK 1.
+- `hle_audio.c` — o diagnóstico de stall da v7 no watchdog de áudio
+  (200 ms sem callback do dispositivo) + o sinal de hold que o
+  catch-up lê (`dm_audio_is_suspended()`): com o jogo pausado, em
+  menu ou em entrada de texto, o catch-up congela a voz em vez de
+  avançar o áudio segundos à frente.
 
 ## Limite honesto
 
 O host da v21 (SHA `0578c08f…`, 1.712.184 bytes) foi buildado a partir
 de um fork-local do nx2android que carrega outras alterações não
-commitadas de outros projetos. Em particular, as correções de áudio
-do Setsuna — o catch-up da v5 em `nxnative/dm/host/hle_audren.c`
-(+473 linhas, "service catch-up (I am Setsuna, v5)") e o diagnóstico
-de stall em `nxnative/dm/host/hle_audio.c` — **não** estão neste
-repositório. Um host buildado só com estes 3 arquivos sobre um
-nx2android limpo **não** reproduz o hash da v21 e pode não ter o
-catch-up de áudio. O caminho acima é o documentado, não um build
-provado.
+commitadas de outros projetos. As correções de áudio do Setsuna
+**estão** neste repositório desde o segundo commit: o catch-up da v5
+em `hle_audren.c` e o diagnóstico de stall da v7 em `hle_audio.c`.
+
+Mas um host buildado só com estes 5 arquivos sobre um nx2android
+limpo **ainda não** reproduz o hash da v21, e o build a partir do repo
+segue não provado. Falta a cola que liga os dois arquivos de áudio ao
+resto do host: as declarações em `nxnative/dm/host/dm.h` (que no fork
+está misturada com os gates de observação de outros projetos — Guns,
+Gore and Cannoli 2 e Astroneer — e por isso não pode ser copiada
+verbatim), o despachante IPC `hle_audren_sf.c` (arquivo novo no fork,
+145 linhas, sem o qual o jogo nunca alcança o serviço), o gancho
+`audren:u` em `hle_sf.c` e as notas de evento em `front_android.c` /
+`hle_oe.c`. O caminho acima é o documentado, não um build provado.
